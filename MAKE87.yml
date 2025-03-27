@@ -1,6 +1,19 @@
 build_kit:
-  name: rust
+  name: python3
   version: latest
+peripheral_requirements:
+  - name: CAMERA
+    peripheral_type: Camera
 outbound_topics:
-  - name: OUTGOING_MESSAGE
-    message_type: make87_messages.text.text_plain.PlainText
+  - name: VIDEO_DATA
+    message_type: make87_messages.video.any.FrameAny
+config:
+  values:
+    - name: CAMERA_USERNAME
+      description: "Username used for camera login"
+      required: true
+      secret: false
+    - name: CAMERA_PASSWORD
+      description: "Password used for camera login"
+      required: true
+      secret: true
