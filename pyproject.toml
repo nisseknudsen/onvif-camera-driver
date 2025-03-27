@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "app"
+version = "0.0.1"
+dependencies = [
+  "make87==0.0.87",
+  "make87_messages==0.0.94",
+  "onvif_zeep==0.2.12",
+  "av==14.2.0",
+]
+description = "A small example package"
+readme = "README.md"
+requires-python = ">=3.9,<3.13"
+
+
+[tool.setuptools]
+packages = ["app"]
+
+[tool.setuptools.package-data]
+app = []
