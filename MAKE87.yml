@@ -10,10 +10,15 @@ outbound_topics:
 config:
   values:
     - name: ONVIF_USERNAME
-      description: "Username used for onvif login"
+      description: "Username used for onvif login."
       required: true
       secret: false
     - name: ONVIF_PASSWORD
-      description: "Password used for onvif login"
+      description: "Password used for onvif login."
       required: true
       secret: true
+    - name: PROFILE_INDEX
+      description: "Index of the profile to select from all available ones."
+      required: false
+      secret: false
+      default_value: "0"

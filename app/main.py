@@ -97,6 +97,7 @@ def main():
         make87.get_config_value("ONVIF_USERNAME"),
         make87.get_config_value("ONVIF_PASSWORD"),
     )
+    profile_index = make87.get_config_value("PROFILE_INDEX", decode=int)
 
     protocol, ip, port, url_suffix = parse_url(onvif_url)
 
@@ -108,9 +109,12 @@ def main():
 
     # Retrieve available profiles (video configurations)
     profiles = media_service.GetProfiles()
-    if not profiles:
-        raise Exception("No media profiles found!")
-    default_profile = profiles[0]
+    if len(profiles) < profile_index + 1:
+        raise Exception(f"No profile with index {profile_index} available.")
+    default_profile = profiles[profile_index]
+
+    logging.debug("Selected Profile:")
+    logging.debug(default_profile)
 
     # Create a request to get the stream URI.
     stream_req = media_service.create_type("GetStreamUri")
