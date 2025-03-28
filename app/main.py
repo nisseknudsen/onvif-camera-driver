@@ -10,9 +10,13 @@ from make87_messages.video.frame_av1_pb2 import FrameAV1
 from make87_messages.video.frame_h264_pb2 import FrameH264
 from make87_messages.video.frame_h265_pb2 import FrameH265
 from onvif import ONVIFCamera
+from urllib.parse import urlparse, urlunparse
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
-def parse_onvif_url(url):
+def parse_url(url):
     parsed = urlparse(url)
     protocol = parsed.scheme
     ip = parsed.hostname
@@ -20,6 +24,25 @@ def parse_onvif_url(url):
     url_suffix = parsed.path  # The part after the IP and port
 
     return protocol, ip, port, url_suffix
+
+
+def inject_rtsp_auth(uri: str, username: str, password: str) -> str:
+    parsed = urlparse(uri)
+
+    netloc_with_auth = f"{username}:{password}@{parsed.hostname}"
+    if parsed.port:
+        netloc_with_auth += f":{parsed.port}"
+
+    return urlunparse(
+        (
+            parsed.scheme,
+            netloc_with_auth,
+            parsed.path,
+            parsed.params,
+            parsed.query,
+            parsed.fragment,
+        )
+    )
 
 
 # Generic function for encoding frames
@@ -60,23 +83,24 @@ def check_annex_b_format(packet: av.Packet):
     # Check if the packet starts with the Annex B start code
     data = bytes(packet)  # get the raw packet bytes
     if not (data.startswith(b"\x00\x00\x00\x01") or data.startswith(b"\x00\x00\x01")):
-        raise NotImplementedError("Only Annex B format is supported for H.264/H.265 streams.")
+        raise NotImplementedError(
+            "Only Annex B format is supported for H.264/H.265 streams."
+        )
 
 
 def main():
     make87.initialize()
     topic = make87.get_publisher(name="VIDEO_DATA", message_type=FrameAny)
-    onvif_url = make87.resolve_peripheral_name("ONVIF_DEVICE")  # http://10.82.11.167:80/onvif/device_service
 
-    # Example usage:
-    protocol, ip, port, url_suffix = parse_onvif_url(onvif_url)
+    onvif_url = make87.resolve_peripheral_name("ONVIF_DEVICE")
+    username, password = (
+        make87.get_config_value("ONVIF_USERNAME"),
+        make87.get_config_value("ONVIF_PASSWORD"),
+    )
 
-    logging.debug("Protocol:", protocol)
-    logging.debug("IP:", ip)
-    logging.debug("Port:", port)
-    logging.debug("URL Suffix:", url_suffix)
+    protocol, ip, port, url_suffix = parse_url(onvif_url)
 
-    camera = ONVIFCamera(ip, port, make87.get_config_value("ONVIF_USERNAME"), make87.get_config_value("ONVIF_PASSWORD"))
+    camera = ONVIFCamera(host=ip, port=port, user=username, passwd=password)
 
     # --- Get the streaming URI via the Media service ---
     # Create the media service client.
@@ -91,29 +115,25 @@ def main():
     # Create a request to get the stream URI.
     stream_req = media_service.create_type("GetStreamUri")
     stream_req.ProfileToken = default_profile.token
-    stream_req.StreamSetup = {"Stream": "RTP-Unicast", "Transport": {"Protocol": "RTSP"}}
+    stream_req.StreamSetup = {
+        "Stream": "RTP-Unicast",
+        "Transport": {"Protocol": "RTSP"},
+    }
 
     stream_uri = media_service.GetStreamUri(stream_req).Uri
     logging.info(f"Stream URI: {stream_uri}")
 
-    # Read Camera Configuration
-    config = {
-        "username": make87.get_config_value("CAMERA_USERNAME"),
-        "password": make87.get_config_value("CAMERA_PASSWORD"),
-        "ip": make87.get_config_value("CAMERA_IP"),
-        "port": make87.get_config_value("CAMERA_PORT", default=554, decode=int),
-        "suffix": make87.get_config_value("CAMERA_URI_SUFFIX", default=""),
-        "stream_index": make87.get_config_value("STREAM_INDEX", default=0, decode=int),
-    }
-
-    stream_uri = f"rtsp://{config['username']}:{config['password']}@{config['ip']}:{config['port']}/{config['suffix']}"
+    _, _, _, entity_path = parse_url(url=stream_uri)
+    stream_uri = inject_rtsp_auth(uri=stream_uri, username=username, password=password)
     with av.open(stream_uri) as container:
         stream_start = datetime.now()  # Reference timestamp
 
         # Find the requested video stream
-        video_stream = next(iter(s for s in container.streams if s.index == config["stream_index"]), None)
-        if video_stream is None:
-            raise ValueError(f"Stream index {config['stream_index']} not found.")
+        video_streams = container.streams.video
+        if len(video_streams) == 0:
+            raise ValueError("No video stream not found.")
+
+        video_stream = video_streams[0]
 
         # Print stream information
         stream_info = {
@@ -123,7 +143,7 @@ def main():
             "Pixel Format": video_stream.pix_fmt,
             "Frame Rate": str(video_stream.average_rate),
         }
-        logger.info("Stream Attributes:", stream_info)
+        logger.info(f"Stream Attributes: {stream_info}")
 
         # Validate codec support
         codec_name = video_stream.codec_context.name
@@ -151,7 +171,7 @@ def main():
             relative_timestamp = (packet.pts - start_pts) * time_base
             absolute_timestamp = stream_start + timedelta(seconds=relative_timestamp)
 
-            header = Header(entity_path=f"/camera/{config['ip']}/{config['suffix']}")
+            header = Header(entity_path=f"/camera/{entity_path.removeprefix('/')}")
             header.timestamp.FromDatetime(absolute_timestamp)
 
             # Encode and publish the frame
