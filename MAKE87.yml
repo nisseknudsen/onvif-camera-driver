@@ -2,18 +2,18 @@ build_kit:
   name: python3
   version: latest
 peripheral_requirements:
-  - name: CAMERA
+  - name: ONVIF_DEVICE
     peripheral_type: Camera
 outbound_topics:
   - name: VIDEO_DATA
     message_type: make87_messages.video.any.FrameAny
 config:
   values:
-    - name: CAMERA_USERNAME
-      description: "Username used for camera login"
+    - name: ONVIF_USERNAME
+      description: "Username used for onvif login"
       required: true
       secret: false
-    - name: CAMERA_PASSWORD
-      description: "Password used for camera login"
+    - name: ONVIF_PASSWORD
+      description: "Password used for onvif login"
       required: true
       secret: true
