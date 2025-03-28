@@ -97,7 +97,7 @@ def main():
         make87.get_config_value("ONVIF_USERNAME"),
         make87.get_config_value("ONVIF_PASSWORD"),
     )
-    profile_index = make87.get_config_value("PROFILE_INDEX", decode=int)
+    profile_index = make87.get_config_value("PROFILE_INDEX", default="0", decode=int)
 
     protocol, ip, port, url_suffix = parse_url(onvif_url)
 
