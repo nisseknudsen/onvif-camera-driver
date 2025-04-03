@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime, timedelta
-from urllib.parse import urlparse
 
 import av
 import make87
@@ -83,9 +82,7 @@ def check_annex_b_format(packet: av.Packet):
     # Check if the packet starts with the Annex B start code
     data = bytes(packet)  # get the raw packet bytes
     if not (data.startswith(b"\x00\x00\x00\x01") or data.startswith(b"\x00\x00\x01")):
-        raise NotImplementedError(
-            "Only Annex B format is supported for H.264/H.265 streams."
-        )
+        raise NotImplementedError("Only Annex B format is supported for H.264/H.265 streams.")
 
 
 def main():
